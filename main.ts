@@ -1,85 +1,131 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, addIcon, } from 'obsidian';
+import { grammarlyPlugin } from "./business-logic";
+import { Extension } from "@codemirror/state";
 
 // Remember to rename these classes and interfaces!
 
 interface MyPluginSettings {
-	mySetting: string;
+	left_offset: string;
+	top_offset: string;
+	client_id: string;
+	disable_tooltip: string;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+	left_offset: "0",
+	top_offset: "0",
+	client_id: "client_XXXC",
+	disable_tooltip: "true",
 }
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
-
+	private ext: Extension;
+	private extArray: Extension[] = [];
 	async onload() {
+		console.log("loading plugin");
 		await this.loadSettings();
 
+		// This is to add Grammarly icon
+		addIcon(
+			"grammarly-icon",
+			'<svg fill="currentColor"  viewBox="0 0 24 24" role="img" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M24 12c0 6.627-5.373 12-12 12S0 18.627 0 12C0 5.372 5.373 0 12 0c6.628 0 12 5.372 12 12m-9.633 1.626a.81.815 0 0 0-.799.965c.071.393.44.662.84.662h1.257l.729-.102c-1.166 1.71-3.19 2.498-5.405 2.15-1.802-.282-3.35-1.502-4.003-3.205-1.483-3.865 1.34-7.556 5.02-7.556 1.916 0 3.598 1.122 4.562 2.478.277.39.763.504 1.133.248a.795.8 0 0 0 .236-1.069h.006a7.04 7.04 0 0 0-6.425-3.233c-3.508.236-6.347 3.107-6.55 6.617-.233 4.086 3.007 7.421 7.037 7.421a6.976 6.976 0 0 0 5.304-2.413l-.153.855v.773c0 .4.269.77.662.84a.814.814 0 0 0 .964-.8v-4.63h-4.415"/></svg>'
+		);
+
 		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
+		const ribbonIconEl = this.addRibbonIcon('grammarly-icon',
+			'Enable Grammarly', (evt: MouseEvent) => {
+			this.enableGrammarly();
 		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
+
+
+		this.registerObsidianProtocolHandler("grammarly-auth",(res) =>{
+			const url = `obsidian://grammarly-auth?code=${res.code}&state=${res.state}`;
+			this.enableGrammarlyLogin(url);
+		});
+
 
 		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
 		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
+		statusBarItemEl.setText('Grammarly enabled');
 
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
 		// This adds an editor command that can perform some operation on the current editor instance
 		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
+			id: 'grammarly-editor-command',
+			name: 'Enable Grammarly',
 			editorCallback: (editor: Editor, view: MarkdownView) => {
 				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
+				this.enableGrammarly();
 			}
 		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
 
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-			}
-		});
+		if(!this.ext){
+			this.ext = grammarlyPlugin;
+			this.extArray = [this.ext];
+			this.registerEditorExtension(this.extArray);
+		}
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
 	}
 
 	onunload() {
+		console.log("unloading  plugin");
+	}
+	private enableGrammarly() {
+		new Notice("Grammarly has been enabled.....");
+		const view = this?.app?.workspace?.activeLeaf?.view;
+		if(view==null){
+			new Notice("No View Found!");
+		}
 
+		const editorView = (view as any).editor.cm;
+
+		const plugin = editorView.plugin(grammarlyPlugin);
+		if (!plugin){
+			new Notice("No Plugin Found!");
+			return;
+		}
+		plugin.initialize(editorView, this.settings);
+		/* Look for Grammarly-powered tooltip, and if found, remove element. */
+		const tooltip_observer = new MutationObserver(tooltip_callback);
+		function tooltip_callback(mutations: MutationRecord[]) {
+			for (var i = 0; i < mutations.length; i++) {
+				var mutation = mutations[i];
+				if (mutation.addedNodes.length < 1) {
+					console.log("mutation.addedNodes.length is zero");
+					return;
+				}
+				for (var j = 0; j < mutation.addedNodes.length; j++){
+					var node = mutation.addedNodes[j] as HTMLBodyElement;
+					if(node.innerText == "Grammarly-powered editor"){
+						node.remove();
+					}
+				}
+
+			}
+		}
+		const tooltip_observer_element = document.querySelector("body")!;
+		console.log(this.settings);
+		if (this.settings.disable_tooltip == "true"){
+			tooltip_observer.observe(tooltip_observer_element,{
+				childList: true,
+			})
+		}
+	}
+
+	enableGrammarlyLogin(url: string) {
+		const view = this?.app?.workspace?.activeLeaf?.view;
+		if(view == null){
+			console.log("The view object is null");
+			new Notice("No View Found!");
+			return;
+		}
+		const editorView = (view as any).editor.cm;
+		const plugin = editorView.plugin(grammarlyPlugin);
+		if(plugin){
+			plugin.authenticateUser(url, this.settings);
+		}
 	}
 
 	async loadSettings() {
@@ -120,18 +166,61 @@ class SampleSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', {text: 'Settings for my awesome plugin.'});
+		containerEl.createEl('h2', {text: 'Grammarly Plugin Settings'});
 
 		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					console.log('Secret: ' + value);
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
+			.setName("Left Popover Offset (in pixels)")
+			.setDesc(
+				"The Grammarly popover is placed incorrectly when using certain themes. If you encoutner this, this setting allows you to offset it to the left it so that it looks right."
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Enter offset (in pixels)")
+					.setValue(this.plugin.settings.left_offset)
+					.onChange(async (value) => {
+						this.plugin.settings.left_offset = value;
+						await this.plugin.saveSettings();
+					})
+			);
+		new Setting(containerEl)
+			.setName("Top Popover Offset (in pixels)")
+			.setDesc(
+				"The Grammarly popover is placed incorrectly when using certain themes. If you encoutner this, this setting allows you to offset it from the top so that it looks right."
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Enter offset (in pixels)")
+					.setValue(this.plugin.settings.top_offset)
+					.onChange(async (value) => {
+						this.plugin.settings.top_offset = value;
+						await this.plugin.saveSettings();
+					})
+			);
+		new Setting(containerEl)
+			.setName("Grammarly Client ID")
+			.setDesc(
+				"The Grammarly Editor SDK requires a client ID to operate. One is included by default, but you can change it if you like."
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Client ID")
+					.setValue(this.plugin.settings.client_id)
+					.onChange(async (value) => {
+						this.plugin.settings.client_id = value;
+						await this.plugin.saveSettings();
+					})
+			);
+		new Setting(containerEl)
+			.setName("Remove Grammarly tooltip")
+			.setDesc("Set to false to show tooltip.")
+			.addText((text) =>
+				text
+					.setPlaceholder("Remove tooltip")
+					.setValue(this.plugin.settings.disable_tooltip)
+					.onChange(async (value) => {
+						this.plugin.settings.disable_tooltip = value;
+						await this.plugin.saveSettings();
+					})
+			);
 	}
 }
