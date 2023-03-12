@@ -4,7 +4,7 @@ import { Extension } from "@codemirror/state";
 
 // Remember to rename these classes and interfaces!
 
-interface MyPluginSettings {
+export interface MyPluginSettings {
 	left_offset: string;
 	top_offset: string;
 	client_id: string;
@@ -14,7 +14,7 @@ interface MyPluginSettings {
 const DEFAULT_SETTINGS: MyPluginSettings = {
 	left_offset: "0",
 	top_offset: "0",
-	client_id: "client_XXXC",
+	client_id: "hello-world",
 	disable_tooltip: "true",
 }
 
@@ -40,6 +40,8 @@ export default class MyPlugin extends Plugin {
 
 
 		this.registerObsidianProtocolHandler("grammarly-auth",(res) =>{
+			console.log(`res.code is ${res.code} res.state is ${res.state}`);
+			new Notice(`res.code is ${res.code} res.state is ${res.state}`);
 			const url = `obsidian://grammarly-auth?code=${res.code}&state=${res.state}`;
 			this.enableGrammarlyLogin(url);
 		});
