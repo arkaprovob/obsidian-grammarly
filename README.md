@@ -1,19 +1,17 @@
-# Obsidian Sample Plugin
+# Obsidian Grammarly Plugin
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+This is the Grammarly plugin for Obsidian (https://obsidian.md).
 
 This project uses Typescript to provide type checking and documentation.
 The repo depends on the latest plugin API (obsidian.d.ts) in Typescript Definition format, which contains TSDoc comments describing what it does.
 
 **Note:** The Obsidian API is still in early alpha and is subject to change at any time!
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Changes the default font color to red using `styles.css`.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+This plugin enables grammarly checking support in obsidian.
+- Enable/ Disable grammarly check
+- Set grammarly client key
+
+## This is a work in progress.
 
 ## First time developing plugins?
 
